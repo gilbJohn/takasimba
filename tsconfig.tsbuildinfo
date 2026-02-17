@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/workoutform.tsx","./src/components/workouthistory.tsx","./src/data/exercises.ts","./src/hooks/useworkouts.ts"],"version":"5.6.3"}

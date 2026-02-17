@@ -21,12 +21,15 @@ npm run dev
 
 # Build for production
 npm run build
+
+# Start production server
+npm start
 ```
 
 ## Tech Stack
 
-- React 18 + TypeScript
-- Vite
+- Next.js 14 (App Router)
+- React 18 + TypeScript (TSX)
 - date-fns
 
 ## Muscle Groups
