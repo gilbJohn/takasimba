@@ -10,6 +10,7 @@ export const DEFAULT_EXERCISES: Exercise[] = [
   // Back
   { id: 'deadlift', name: 'Deadlift', muscleGroup: 'back', equipment: 'Barbell' },
   { id: 'barbell-row', name: 'Barbell Row', muscleGroup: 'back', equipment: 'Barbell' },
+  { id: 'chest-supported-row', name: 'Chest Supported Row', muscleGroup: 'back', equipment: 'Machine' },
   { id: 'pull-up', name: 'Pull Up', muscleGroup: 'back', equipment: 'Bodyweight' },
   { id: 'lat-pulldown', name: 'Lat Pulldown', muscleGroup: 'back', equipment: 'Cable' },
   { id: 'face-pull', name: 'Face Pull', muscleGroup: 'back', equipment: 'Cable' },
@@ -17,6 +18,7 @@ export const DEFAULT_EXERCISES: Exercise[] = [
   { id: 'ohp', name: 'Overhead Press', muscleGroup: 'shoulders', equipment: 'Barbell' },
   { id: 'lateral-raise', name: 'Lateral Raise', muscleGroup: 'shoulders', equipment: 'Dumbbell' },
   { id: 'rear-delt-fly', name: 'Rear Delt Fly', muscleGroup: 'shoulders', equipment: 'Dumbbell' },
+  { id: 'reverse-delt-fly', name: 'Reverse Delt Fly', muscleGroup: 'shoulders', equipment: 'Machine' },
   { id: 'arnold-press', name: 'Arnold Press', muscleGroup: 'shoulders', equipment: 'Dumbbell' },
   // Biceps
   { id: 'barbell-curl', name: 'Barbell Curl', muscleGroup: 'biceps', equipment: 'Barbell' },

@@ -19,8 +19,10 @@ export interface Exercise {
 
 export interface SetLog {
   reps: number
-  weight: number // kg
+  weight: number // lbs
   rpe?: number // 1-10 RPE scale
+  effort?: number // 1-5 how hard the set felt
+  form?: number // 1-5 how good the form was
 }
 
 export interface ExerciseLog {
@@ -40,6 +42,6 @@ export interface Workout {
 
 export interface WorkoutSummary {
   totalSets: number
-  totalVolume: number // kg
+  totalVolume: number // lbs (reps × weight)
   duration?: number // minutes
 }

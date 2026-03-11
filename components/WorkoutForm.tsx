@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Workout, ExerciseLog, SetLog } from '@/lib/types'
 import { DEFAULT_EXERCISES } from '@/lib/data/exercises'
 import { format } from 'date-fns'
@@ -14,12 +14,46 @@ function formatMuscleGroup(group: string) {
   return group.charAt(0).toUpperCase() + group.slice(1)
 }
 
-export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) {
+interface WorkoutFormProps {
+  onSave: (workout: Workout) => void
+  initialWorkout?: Workout | null
+  onCancel?: () => void
+  pastWorkouts?: Workout[]
+}
+
+function getLastExerciseLog(exerciseId: string, workouts: Workout[]): ExerciseLog | null {
+  for (const w of workouts) {
+    const ex = w.exercises.find((e) => e.exerciseId === exerciseId)
+    if (ex && ex.sets.length > 0) return ex
+  }
+  return null
+}
+
+export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [] }: WorkoutFormProps) {
   const [name, setName] = useState('')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [exercises, setExercises] = useState<ExerciseLog[]>([])
   const [selectedExercise, setSelectedExercise] = useState('')
   const [filterGroup, setFilterGroup] = useState<string>('')
+
+  const isEditing = !!initialWorkout
+
+  useEffect(() => {
+    if (initialWorkout) {
+      setName(initialWorkout.name)
+      setDate(initialWorkout.date)
+      setExercises(
+        initialWorkout.exercises.map((e) => ({
+          ...e,
+          sets: e.sets.map((s) => ({ ...s })),
+        }))
+      )
+    } else {
+      setName('')
+      setDate(format(new Date(), 'yyyy-MM-dd'))
+      setExercises([])
+    }
+  }, [initialWorkout])
 
   const filteredExercises = filterGroup
     ? DEFAULT_EXERCISES.filter((e) => e.muscleGroup === filterGroup)
@@ -30,13 +64,24 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
     const ex = DEFAULT_EXERCISES.find((e) => e.id === selectedExercise)
     if (!ex || exercises.some((e) => e.exerciseId === ex.id)) return
 
+    const lastLog = getLastExerciseLog(ex.id, pastWorkouts)
+    const sets = lastLog
+      ? lastLog.sets.map((s) => ({
+          reps: s.reps,
+          weight: s.weight,
+          ...(s.rpe != null && { rpe: s.rpe }),
+          ...(s.effort != null && { effort: s.effort }),
+          ...(s.form != null && { form: s.form }),
+        }))
+      : [{ reps: 10, weight: 0 }]
+
     setExercises((prev) => [
       ...prev,
       {
         exerciseId: ex.id,
         exerciseName: ex.name,
         muscleGroup: ex.muscleGroup,
-        sets: [{ reps: 10, weight: 0 }],
+        sets,
       },
     ])
     setSelectedExercise('')
@@ -48,11 +93,22 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
 
   const addSet = (exerciseId: string) => {
     setExercises((prev) =>
-      prev.map((e) =>
-        e.exerciseId === exerciseId
-          ? { ...e, sets: [...e.sets, { reps: 10, weight: e.sets[0]?.weight ?? 0 }] }
-          : e
-      )
+      prev.map((e) => {
+        if (e.exerciseId !== exerciseId) return e
+        const last = e.sets[e.sets.length - 1]
+        return {
+          ...e,
+          sets: [
+            ...e.sets,
+            {
+              reps: last?.reps ?? 10,
+              weight: last?.weight ?? 0,
+              ...(last?.effort != null && { effort: last.effort }),
+              ...(last?.form != null && { form: last.form }),
+            },
+          ],
+        }
+      })
     )
   }
 
@@ -80,20 +136,29 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
   const handleSave = () => {
     if (!name.trim() || exercises.length === 0) return
 
-    const workout: Workout = {
-      id: crypto.randomUUID(),
-      date,
-      name: name.trim(),
-      exercises: exercises.map((e) => ({
+    const cleanedExercises = exercises
+      .map((e) => ({
         ...e,
         sets: e.sets.filter((s) => s.reps > 0 || s.weight > 0),
-      })).filter((e) => e.sets.length > 0),
+      }))
+      .filter((e) => e.sets.length > 0)
+
+    if (cleanedExercises.length === 0) return
+
+    const workout: Workout = {
+      id: initialWorkout?.id ?? crypto.randomUUID(),
+      date,
+      name: name.trim(),
+      exercises: cleanedExercises,
+      ...(initialWorkout?.notes && { notes: initialWorkout.notes }),
     }
 
     onSave(workout)
-    setName('')
-    setDate(format(new Date(), 'yyyy-MM-dd'))
-    setExercises([])
+    if (!isEditing) {
+      setName('')
+      setDate(format(new Date(), 'yyyy-MM-dd'))
+      setExercises([])
+    }
   }
 
   return (
@@ -146,7 +211,17 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
         {exercises.map((ex) => (
           <div key={ex.exerciseId} className="exercise-card">
             <div className="exercise-header">
-              <h3>{ex.exerciseName}</h3>
+              <div>
+                <h3>{ex.exerciseName}</h3>
+                {pastWorkouts.length > 0 && (() => {
+                  const last = getLastExerciseLog(ex.exerciseId, pastWorkouts)
+                  if (!last) return null
+                  const hint = last.sets.map((s) => `${s.reps}×${s.weight}lbs`).join(', ')
+                  return (
+                    <span className="last-time-hint">Last: {hint}</span>
+                  )
+                })()}
+              </div>
               <button
                 type="button"
                 onClick={() => removeExercise(ex.exerciseId)}
@@ -156,14 +231,16 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
                 ×
               </button>
             </div>
-            <div className="sets-header">
+            <div className="sets-header sets-header-extended">
               <span>Set</span>
               <span>Reps</span>
-              <span>Weight (kg)</span>
+              <span>Weight (lbs)</span>
+              <span>Effort</span>
+              <span>Form</span>
               <span></span>
             </div>
             {ex.sets.map((set, i) => (
-              <div key={i} className="set-row">
+              <div key={i} className="set-row set-row-extended">
                 <span className="set-num">{i + 1}</span>
                 <input
                   type="number"
@@ -180,6 +257,26 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
                   onChange={(e) => updateSet(ex.exerciseId, i, { weight: +e.target.value })}
                   className="input input-sm"
                   placeholder="0"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={set.effort ?? ''}
+                  onChange={(e) => updateSet(ex.exerciseId, i, { effort: e.target.value ? +e.target.value : undefined })}
+                  className="input input-sm input-effort"
+                  placeholder="1-5"
+                  title="Effort (1-5)"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={set.form ?? ''}
+                  onChange={(e) => updateSet(ex.exerciseId, i, { form: e.target.value ? +e.target.value : undefined })}
+                  className="input input-sm input-form"
+                  placeholder="1-5"
+                  title="Form (1-5)"
                 />
                 <button
                   type="button"
@@ -202,14 +299,21 @@ export function WorkoutForm({ onSave }: { onSave: (workout: Workout) => void }) 
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={!name.trim() || exercises.length === 0}
-        className="btn btn-primary btn-save"
-      >
-        Save Workout
-      </button>
+      <div className={`form-actions ${isEditing ? 'form-actions-sticky' : ''}`}>
+        {isEditing && onCancel && (
+          <button type="button" onClick={onCancel} className="btn btn-secondary">
+            Cancel
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!name.trim() || exercises.length === 0}
+          className="btn btn-primary btn-save"
+        >
+          {isEditing ? 'Update Workout' : 'Save Workout'}
+        </button>
+      </div>
     </div>
   )
 }

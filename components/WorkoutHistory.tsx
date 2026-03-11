@@ -2,26 +2,17 @@
 
 import { format } from 'date-fns'
 import type { Workout } from '@/lib/types'
-
-function getWorkoutSummary(workout: Workout) {
-  let totalSets = 0
-  let totalVolume = 0
-
-  workout.exercises.forEach((ex) => {
-    ex.sets.forEach((set) => {
-      totalSets++
-      totalVolume += set.reps * set.weight
-    })
-  })
-
-  return { totalSets, totalVolume }
-}
+import { getWorkoutSummary } from '@/lib/workout-stats'
 
 export function WorkoutHistory({
   workouts,
+  onEdit,
+  onDuplicate,
   onDelete,
 }: {
   workouts: Workout[]
+  onEdit: (workout: Workout) => void
+  onDuplicate: (workout: Workout) => void
   onDelete: (id: string) => void
 }) {
   if (workouts.length === 0) {
@@ -45,19 +36,37 @@ export function WorkoutHistory({
                   {format(new Date(workout.date), 'EEE, MMM d, yyyy')}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => onDelete(workout.id)}
-                className="btn-remove"
-                aria-label="Delete workout"
-              >
-                ×
-              </button>
+              <div className="workout-card-actions">
+                <button
+                  type="button"
+                  onClick={() => onDuplicate(workout)}
+                  className="btn-duplicate"
+                  aria-label="Duplicate workout"
+                >
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEdit(workout)}
+                  className="btn-edit"
+                  aria-label="Edit workout"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(workout.id)}
+                  className="btn-remove"
+                  aria-label="Delete workout"
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="workout-stats">
               <span>{workout.exercises.length} exercises</span>
               <span>{totalSets} sets</span>
-              <span>{totalVolume.toFixed(0)} kg volume</span>
+              <span>{totalVolume.toFixed(0)} lbs volume</span>
             </div>
             <div className="workout-exercises">
               {workout.exercises.map((ex) => (
@@ -66,7 +75,7 @@ export function WorkoutHistory({
                   <span className="exercise-sets">
                     {ex.sets.map((s, i) => (
                       <span key={i} className="set-badge">
-                        {s.reps}×{s.weight}kg
+                        {s.reps}×{s.weight}lbs
                       </span>
                     ))}
                   </span>
