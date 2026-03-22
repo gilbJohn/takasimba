@@ -87,31 +87,17 @@ export async function fetchWorkouts(supabase: SupabaseClient, userId: string): P
   })
 }
 
-export async function insertWorkout(
+async function insertExerciseLogs(
   supabase: SupabaseClient,
-  userId: string,
-  workout: Workout
+  workoutId: string,
+  exercises: ExerciseLog[]
 ): Promise<void> {
-  const { data: workoutRow, error: workoutError } = await supabase
-    .from('workouts')
-    .insert({
-      id: workout.id,
-      user_id: userId,
-      date: workout.date,
-      name: workout.name,
-      notes: workout.notes ?? null,
-    })
-    .select('id')
-    .single()
-
-  if (workoutError) throw workoutError
-
-  for (let i = 0; i < workout.exercises.length; i++) {
-    const ex = workout.exercises[i]
+  for (let i = 0; i < exercises.length; i++) {
+    const ex = exercises[i]
     const { data: logRow, error: logError } = await supabase
       .from('exercise_logs')
       .insert({
-        workout_id: workout.id,
+        workout_id: workoutId,
         exercise_id: ex.exerciseId,
         exercise_name: ex.exerciseName,
         muscle_group: ex.muscleGroup,
@@ -141,6 +127,26 @@ export async function insertWorkout(
   }
 }
 
+export async function insertWorkout(
+  supabase: SupabaseClient,
+  userId: string,
+  workout: Workout
+): Promise<void> {
+  const { error: workoutError } = await supabase
+    .from('workouts')
+    .insert({
+      id: workout.id,
+      user_id: userId,
+      date: workout.date,
+      name: workout.name,
+      notes: workout.notes ?? null,
+    })
+
+  if (workoutError) throw workoutError
+
+  await insertExerciseLogs(supabase, workout.id, workout.exercises)
+}
+
 export async function updateWorkout(
   supabase: SupabaseClient,
   workout: Workout
@@ -163,39 +169,7 @@ export async function updateWorkout(
 
   if (deleteLogsError) throw deleteLogsError
 
-  for (let i = 0; i < workout.exercises.length; i++) {
-    const ex = workout.exercises[i]
-    const { data: logRow, error: logError } = await supabase
-      .from('exercise_logs')
-      .insert({
-        workout_id: workout.id,
-        exercise_id: ex.exerciseId,
-        exercise_name: ex.exerciseName,
-        muscle_group: ex.muscleGroup,
-        sort_order: i,
-      })
-      .select('id')
-      .single()
-
-    if (logError) throw logError
-
-    const setsToInsert = ex.sets
-      .filter((s) => s.reps > 0 || s.weight > 0)
-      .map((s, j) => ({
-        exercise_log_id: logRow.id,
-        reps: s.reps,
-        weight: s.weight,
-        rpe: s.rpe ?? null,
-        effort: s.effort ?? null,
-        form: s.form ?? null,
-        set_order: j,
-      }))
-
-    if (setsToInsert.length > 0) {
-      const { error: setsError } = await supabase.from('sets').insert(setsToInsert)
-      if (setsError) throw setsError
-    }
-  }
+  await insertExerciseLogs(supabase, workout.id, workout.exercises)
 }
 
 export async function deleteWorkout(supabase: SupabaseClient, workoutId: string): Promise<void> {

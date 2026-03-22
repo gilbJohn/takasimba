@@ -49,25 +49,27 @@ export async function POST(request: Request) {
       'v1beta/models/gemini-2.5-pro',
       'v1beta/models/gemini-exp-1206',
     ]
+
+    const requestBody = JSON.stringify({
+      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nUser input:\n${text}` }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 2048,
+        responseMimeType: 'application/json',
+      },
+    })
+
+    const fetchGemini = (endpoint: string) =>
+      fetch(
+        `https://generativelanguage.googleapis.com/${endpoint}:generateContent?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody }
+      )
+
     let response: Response | null = null
     let errText = ''
 
     for (const endpoint of modelEndpoints) {
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/${endpoint}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nUser input:\n${text}` }] }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 2048,
-              responseMimeType: 'application/json',
-            },
-          }),
-        }
-      )
+      response = await fetchGemini(endpoint)
       if (response.ok) break
       errText = await response.text()
       if (response.status === 429) {
@@ -79,17 +81,7 @@ export async function POST(request: Request) {
             ? Math.ceil(parseFloat(retryMatchS[1]) * 1000)
             : 1000
         await new Promise((r) => setTimeout(r, Math.min(delayMs, 10000)))
-        const retryResponse = await fetch(
-          `https://generativelanguage.googleapis.com/${endpoint}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nUser input:\n${text}` }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 2048, responseMimeType: 'application/json' },
-            }),
-          }
-        )
+        const retryResponse = await fetchGemini(endpoint)
         if (retryResponse.ok) {
           response = retryResponse
           break

@@ -51,9 +51,8 @@ export default function Home() {
   const handleWorkoutParsed = (workout: Workout) => {
     setEditingWorkout(null)
     setDuplicatingWorkout(null)
-    setParsedWorkout(null)
+    setParsedWorkout(workout)
     setShowQuickLog(false)
-    addWorkout(workout)
   }
 
   if (authLoading) {

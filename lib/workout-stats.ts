@@ -15,15 +15,8 @@ export function getExerciseVolume(exercise: { sets: { reps: number; weight: numb
 }
 
 export function getWorkoutSummary(workout: Workout) {
-  let totalSets = 0
-  let totalVolume = 0
-  workout.exercises.forEach((ex) => {
-    ex.sets.forEach((set) => {
-      totalSets++
-      totalVolume += set.reps * set.weight
-    })
-  })
-  return { totalSets, totalVolume }
+  const totalSets = workout.exercises.reduce((sum, ex) => sum + ex.sets.length, 0)
+  return { totalSets, totalVolume: getWorkoutVolume(workout) }
 }
 
 export function getWorkoutsStats(
