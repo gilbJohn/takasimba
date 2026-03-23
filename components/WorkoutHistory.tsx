@@ -1,8 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { format } from 'date-fns'
 import type { Workout } from '@/lib/types'
 import { getWorkoutSummary } from '@/lib/workout-stats'
+
+const PAGE_SIZE = 20
 
 export function WorkoutHistory({
   workouts,
@@ -15,6 +18,8 @@ export function WorkoutHistory({
   onDuplicate: (workout: Workout) => void
   onDelete: (id: string) => void
 }) {
+  const [page, setPage] = useState(1)
+
   if (workouts.length === 0) {
     return (
       <div className="empty-state">
@@ -23,9 +28,12 @@ export function WorkoutHistory({
     )
   }
 
+  const visible = workouts.slice(0, page * PAGE_SIZE)
+  const hasMore = workouts.length > visible.length
+
   return (
     <div className="workout-history">
-      {workouts.map((workout) => {
+      {visible.map((workout) => {
         const { totalSets, totalVolume } = getWorkoutSummary(workout)
         return (
           <div key={workout.id} className="workout-card">
@@ -33,7 +41,7 @@ export function WorkoutHistory({
               <div>
                 <h3>{workout.name}</h3>
                 <span className="workout-date">
-                  {format(new Date(workout.date), 'EEE, MMM d, yyyy')}
+                  {format(new Date(workout.date + 'T12:00:00'), 'EEE, MMM d, yyyy')}
                 </span>
               </div>
               <div className="workout-card-actions">
@@ -41,9 +49,9 @@ export function WorkoutHistory({
                   type="button"
                   onClick={() => onDuplicate(workout)}
                   className="btn-duplicate"
-                  aria-label="Duplicate workout"
+                  aria-label="Repeat workout"
                 >
-                  Copy
+                  Repeat
                 </button>
                 <button
                   type="button"
@@ -68,6 +76,9 @@ export function WorkoutHistory({
               <span>{totalSets} sets</span>
               <span>{totalVolume.toFixed(0)} lbs volume</span>
             </div>
+            {workout.notes && (
+              <p className="workout-notes">{workout.notes}</p>
+            )}
             <div className="workout-exercises">
               {workout.exercises.map((ex) => (
                 <div key={ex.exerciseId} className="exercise-summary">
@@ -85,6 +96,15 @@ export function WorkoutHistory({
           </div>
         )
       })}
+      {hasMore && (
+        <button
+          type="button"
+          className="btn-load-more"
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Load more ({workouts.length - visible.length} remaining)
+        </button>
+      )}
     </div>
   )
 }
