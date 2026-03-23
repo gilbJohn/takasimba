@@ -1015,6 +1015,39 @@ input {
   }
 }
 
+/* Custom exercise creation */
+.custom-exercise-section {
+  margin-bottom: 1.5rem;
+}
+
+.btn-custom-toggle {
+  background: none;
+  color: var(--accent);
+  font-size: 0.875rem;
+  padding: 0.25rem 0;
+  font-family: inherit;
+}
+
+.btn-custom-toggle:hover {
+  text-decoration: underline;
+}
+
+.custom-exercise-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.custom-exercise-error {
+  color: #fca5a5;
+  font-size: 0.875rem;
+}
+
 /* Workout notes */
 .workout-notes {
   font-size: 0.875rem;

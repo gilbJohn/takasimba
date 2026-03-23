@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { Workout, ExerciseLog, SetLog } from '@/lib/types'
+import type { Workout, ExerciseLog, SetLog, Exercise, MuscleGroup } from '@/lib/types'
 import { DEFAULT_EXERCISES } from '@/lib/data/exercises'
 import { format } from 'date-fns'
 
-const MUSCLE_GROUPS = [
+const MUSCLE_GROUPS: MuscleGroup[] = [
   'chest', 'back', 'shoulders', 'biceps', 'triceps',
   'quads', 'hamstrings', 'glutes', 'calves', 'core'
-] as const
+]
 
 function formatMuscleGroup(group: string) {
   return group.charAt(0).toUpperCase() + group.slice(1)
@@ -20,6 +20,8 @@ interface WorkoutFormProps {
   onCancel?: () => void
   pastWorkouts?: Workout[]
   prs?: Map<string, { weight: number; date: string }>
+  customExercises?: Exercise[]
+  onAddCustomExercise?: (name: string, muscleGroup: MuscleGroup, equipment: string) => Promise<Exercise>
 }
 
 function getLastExerciseLog(exerciseId: string, workouts: Workout[]): ExerciseLog | null {
@@ -30,7 +32,15 @@ function getLastExerciseLog(exerciseId: string, workouts: Workout[]): ExerciseLo
   return null
 }
 
-export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [], prs }: WorkoutFormProps) {
+export function WorkoutForm({
+  onSave,
+  initialWorkout,
+  onCancel,
+  pastWorkouts = [],
+  prs,
+  customExercises = [],
+  onAddCustomExercise,
+}: WorkoutFormProps) {
   const [name, setName] = useState('')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState('')
@@ -38,7 +48,24 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
   const [selectedExercise, setSelectedExercise] = useState('')
   const [filterGroup, setFilterGroup] = useState<string>('')
 
+  // Custom exercise creation state
+  const [showCustomForm, setShowCustomForm] = useState(false)
+  const [customName, setCustomName] = useState('')
+  const [customMuscleGroup, setCustomMuscleGroup] = useState<MuscleGroup>('chest')
+  const [customEquipment, setCustomEquipment] = useState('')
+  const [customSaving, setCustomSaving] = useState(false)
+  const [customError, setCustomError] = useState<string | null>(null)
+
   const isEditing = !!initialWorkout
+
+  const allExercises: Exercise[] = [
+    ...DEFAULT_EXERCISES,
+    ...customExercises,
+  ].sort((a, b) => {
+    // Sort by muscle group first, then name
+    if (a.muscleGroup !== b.muscleGroup) return a.muscleGroup.localeCompare(b.muscleGroup)
+    return a.name.localeCompare(b.name)
+  })
 
   useEffect(() => {
     if (initialWorkout) {
@@ -60,12 +87,11 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
   }, [initialWorkout])
 
   const filteredExercises = filterGroup
-    ? DEFAULT_EXERCISES.filter((e) => e.muscleGroup === filterGroup)
-    : DEFAULT_EXERCISES
+    ? allExercises.filter((e) => e.muscleGroup === filterGroup)
+    : allExercises
 
-  const addExercise = () => {
-    if (!selectedExercise) return
-    const ex = DEFAULT_EXERCISES.find((e) => e.id === selectedExercise)
+  const addExerciseById = (exerciseId: string, allEx: Exercise[]) => {
+    const ex = allEx.find((e) => e.id === exerciseId)
     if (!ex || exercises.some((e) => e.exerciseId === ex.id)) return
 
     const lastLog = getLastExerciseLog(ex.id, pastWorkouts)
@@ -88,7 +114,29 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
         sets,
       },
     ])
+  }
+
+  const addExercise = () => {
+    if (!selectedExercise) return
+    addExerciseById(selectedExercise, allExercises)
     setSelectedExercise('')
+  }
+
+  const handleCreateAndAdd = async () => {
+    if (!customName.trim() || !onAddCustomExercise) return
+    setCustomSaving(true)
+    setCustomError(null)
+    try {
+      const newEx = await onAddCustomExercise(customName.trim(), customMuscleGroup, customEquipment)
+      addExerciseById(newEx.id, [...allExercises, newEx])
+      setCustomName('')
+      setCustomEquipment('')
+      setShowCustomForm(false)
+    } catch (err) {
+      setCustomError(err instanceof Error ? err.message : 'Failed to create exercise')
+    } finally {
+      setCustomSaving(false)
+    }
   }
 
   const removeExercise = (exerciseId: string) => {
@@ -213,14 +261,62 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
           <option value="">Select exercise</option>
           {filteredExercises.map((ex) => (
             <option key={ex.id} value={ex.id}>
-              {ex.name} ({ex.equipment})
+              {ex.name} ({ex.equipment ?? 'Other'})
             </option>
           ))}
         </select>
         <button type="button" onClick={addExercise} className="btn btn-secondary">
-          Add Exercise
+          Add
         </button>
       </div>
+
+      {onAddCustomExercise && (
+        <div className="custom-exercise-section">
+          <button
+            type="button"
+            className="btn-custom-toggle"
+            onClick={() => { setShowCustomForm((v) => !v); setCustomError(null) }}
+          >
+            {showCustomForm ? '− Cancel custom exercise' : '+ Create custom exercise'}
+          </button>
+          {showCustomForm && (
+            <div className="custom-exercise-form">
+              <input
+                type="text"
+                placeholder="Exercise name (e.g. Hack Squat)"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="input"
+              />
+              <select
+                value={customMuscleGroup}
+                onChange={(e) => setCustomMuscleGroup(e.target.value as MuscleGroup)}
+                className="select"
+              >
+                {MUSCLE_GROUPS.map((g) => (
+                  <option key={g} value={g}>{formatMuscleGroup(g)}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Equipment (e.g. Machine)"
+                value={customEquipment}
+                onChange={(e) => setCustomEquipment(e.target.value)}
+                className="input"
+              />
+              {customError && <p className="custom-exercise-error">{customError}</p>}
+              <button
+                type="button"
+                onClick={handleCreateAndAdd}
+                disabled={!customName.trim() || customSaving}
+                className="btn btn-primary"
+              >
+                {customSaving ? 'Saving…' : 'Create & Add to Workout'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="exercises-list">
         {exercises.map((ex) => {

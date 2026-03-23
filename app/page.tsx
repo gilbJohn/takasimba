@@ -10,12 +10,14 @@ import { QuickLogInput } from '@/components/QuickLogInput'
 import { AuthForm } from '@/components/AuthForm'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkouts } from '@/hooks/useWorkouts'
+import { useCustomExercises } from '@/hooks/useCustomExercises'
 import { computePRs } from '@/lib/workout-stats'
 import type { Workout } from '@/lib/types'
 
 export default function Home() {
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
   const { workouts, addWorkout, updateWorkout, deleteWorkout, loading: workoutsLoading, error, retry } = useWorkouts(user?.id)
+  const { customExercises, addCustomExercise } = useCustomExercises(user?.id)
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
   const [duplicatingWorkout, setDuplicatingWorkout] = useState<Workout | null>(null)
   const [parsedWorkout, setParsedWorkout] = useState<Workout | null>(null)
@@ -179,6 +181,8 @@ export default function Home() {
                 }
                 pastWorkouts={workouts}
                 prs={prs}
+                customExercises={customExercises}
+                onAddCustomExercise={addCustomExercise}
               />
             </section>
 
