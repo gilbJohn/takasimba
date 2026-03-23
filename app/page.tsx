@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { WorkoutForm } from '@/components/WorkoutForm'
@@ -10,6 +10,7 @@ import { QuickLogInput } from '@/components/QuickLogInput'
 import { AuthForm } from '@/components/AuthForm'
 import { useAuth } from '@/hooks/useAuth'
 import { useWorkouts } from '@/hooks/useWorkouts'
+import { computePRs } from '@/lib/workout-stats'
 import type { Workout } from '@/lib/types'
 
 export default function Home() {
@@ -20,6 +21,11 @@ export default function Home() {
   const [parsedWorkout, setParsedWorkout] = useState<Workout | null>(null)
   const [showQuickLog, setShowQuickLog] = useState(false)
   const formSectionRef = useRef<HTMLElement>(null)
+
+  const prs = useMemo(
+    () => computePRs(editingWorkout ? workouts.filter((w) => w.id !== editingWorkout.id) : workouts),
+    [workouts, editingWorkout]
+  )
 
   useEffect(() => {
     if (editingWorkout || parsedWorkout) {
@@ -46,6 +52,7 @@ export default function Home() {
       id: crypto.randomUUID(),
       date: format(new Date(), 'yyyy-MM-dd'),
     })
+    formSectionRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const handleWorkoutParsed = (workout: Workout) => {
@@ -138,9 +145,26 @@ export default function Home() {
             </section>
 
             <section ref={formSectionRef} className="section">
-              <h2>
-                {editingWorkout ? 'Edit Workout' : parsedWorkout ? 'Review & save (from AI)' : duplicatingWorkout ? 'Log Workout (from copy)' : 'Log Workout'}
-              </h2>
+              <div className="log-section-header">
+                <h2>
+                  {editingWorkout
+                    ? 'Edit Workout'
+                    : parsedWorkout
+                      ? 'Review & save (from AI)'
+                      : duplicatingWorkout
+                        ? 'Log Workout (from copy)'
+                        : 'Log Workout'}
+                </h2>
+                {!editingWorkout && !duplicatingWorkout && !parsedWorkout && workouts.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-repeat-last"
+                    onClick={() => handleDuplicate(workouts[0])}
+                  >
+                    Repeat last: {workouts[0].name}
+                  </button>
+                )}
+              </div>
               <WorkoutForm
                 onSave={handleSave}
                 initialWorkout={editingWorkout ?? duplicatingWorkout ?? parsedWorkout}
@@ -154,6 +178,7 @@ export default function Home() {
                         : undefined
                 }
                 pastWorkouts={workouts}
+                prs={prs}
               />
             </section>
 

@@ -19,6 +19,7 @@ interface WorkoutFormProps {
   initialWorkout?: Workout | null
   onCancel?: () => void
   pastWorkouts?: Workout[]
+  prs?: Map<string, { weight: number; date: string }>
 }
 
 function getLastExerciseLog(exerciseId: string, workouts: Workout[]): ExerciseLog | null {
@@ -29,9 +30,10 @@ function getLastExerciseLog(exerciseId: string, workouts: Workout[]): ExerciseLo
   return null
 }
 
-export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [] }: WorkoutFormProps) {
+export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [], prs }: WorkoutFormProps) {
   const [name, setName] = useState('')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [notes, setNotes] = useState('')
   const [exercises, setExercises] = useState<ExerciseLog[]>([])
   const [selectedExercise, setSelectedExercise] = useState('')
   const [filterGroup, setFilterGroup] = useState<string>('')
@@ -42,6 +44,7 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
     if (initialWorkout) {
       setName(initialWorkout.name)
       setDate(initialWorkout.date)
+      setNotes(initialWorkout.notes ?? '')
       setExercises(
         initialWorkout.exercises.map((e) => ({
           ...e,
@@ -51,6 +54,7 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
     } else {
       setName('')
       setDate(format(new Date(), 'yyyy-MM-dd'))
+      setNotes('')
       setExercises([])
     }
   }, [initialWorkout])
@@ -150,13 +154,14 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
       date,
       name: name.trim(),
       exercises: cleanedExercises,
-      ...(initialWorkout?.notes && { notes: initialWorkout.notes }),
+      ...(notes.trim() && { notes: notes.trim() }),
     }
 
     onSave(workout)
     if (!isEditing) {
       setName('')
       setDate(format(new Date(), 'yyyy-MM-dd'))
+      setNotes('')
       setExercises([])
     }
   }
@@ -176,6 +181,16 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="input input-date"
+        />
+      </div>
+
+      <div className="form-notes-row">
+        <textarea
+          placeholder="Notes (optional) — e.g. felt strong today, slight shoulder discomfort"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="input input-notes"
+          rows={2}
         />
       </div>
 
@@ -208,95 +223,104 @@ export function WorkoutForm({ onSave, initialWorkout, onCancel, pastWorkouts = [
       </div>
 
       <div className="exercises-list">
-        {exercises.map((ex) => (
-          <div key={ex.exerciseId} className="exercise-card">
-            <div className="exercise-header">
-              <div>
-                <h3>{ex.exerciseName}</h3>
-                {pastWorkouts.length > 0 && (() => {
-                  const last = getLastExerciseLog(ex.exerciseId, pastWorkouts)
-                  if (!last) return null
-                  const hint = last.sets.map((s) => `${s.reps}×${s.weight}lbs`).join(', ')
-                  return (
-                    <span className="last-time-hint">Last: {hint}</span>
-                  )
-                })()}
-              </div>
-              <button
-                type="button"
-                onClick={() => removeExercise(ex.exerciseId)}
-                className="btn-remove"
-                aria-label="Remove exercise"
-              >
-                ×
-              </button>
-            </div>
-            <div className="sets-header sets-header-extended">
-              <span>Set</span>
-              <span>Reps</span>
-              <span>Weight (lbs)</span>
-              <span>Effort</span>
-              <span>Form</span>
-              <span></span>
-            </div>
-            {ex.sets.map((set, i) => (
-              <div key={i} className="set-row set-row-extended">
-                <span className="set-num">{i + 1}</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={set.reps}
-                  onChange={(e) => updateSet(ex.exerciseId, i, { reps: +e.target.value })}
-                  className="input input-sm"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  value={set.weight || ''}
-                  onChange={(e) => updateSet(ex.exerciseId, i, { weight: +e.target.value })}
-                  className="input input-sm"
-                  placeholder="0"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={set.effort ?? ''}
-                  onChange={(e) => updateSet(ex.exerciseId, i, { effort: e.target.value ? +e.target.value : undefined })}
-                  className="input input-sm input-effort"
-                  placeholder="1-5"
-                  title="Effort (1-5)"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={set.form ?? ''}
-                  onChange={(e) => updateSet(ex.exerciseId, i, { form: e.target.value ? +e.target.value : undefined })}
-                  className="input input-sm input-form"
-                  placeholder="1-5"
-                  title="Form (1-5)"
-                />
+        {exercises.map((ex) => {
+          const prWeight = prs?.get(ex.exerciseId)?.weight ?? 0
+          return (
+            <div key={ex.exerciseId} className="exercise-card">
+              <div className="exercise-header">
+                <div>
+                  <h3>{ex.exerciseName}</h3>
+                  {pastWorkouts.length > 0 && (() => {
+                    const last = getLastExerciseLog(ex.exerciseId, pastWorkouts)
+                    if (!last) return null
+                    const hint = last.sets.map((s) => `${s.reps}×${s.weight}lbs`).join(', ')
+                    return (
+                      <span className="last-time-hint">Last: {hint}</span>
+                    )
+                  })()}
+                </div>
                 <button
                   type="button"
-                  onClick={() => removeSet(ex.exerciseId, i)}
-                  className="btn-remove btn-remove-sm"
-                  disabled={ex.sets.length === 1}
+                  onClick={() => removeExercise(ex.exerciseId)}
+                  className="btn-remove"
+                  aria-label="Remove exercise"
                 >
                   ×
                 </button>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => addSet(ex.exerciseId)}
-              className="btn-add-set"
-            >
-              + Add set
-            </button>
-          </div>
-        ))}
+              <div className="sets-header sets-header-extended">
+                <span>Set</span>
+                <span>Reps</span>
+                <span>Weight (lbs)</span>
+                <span>Effort</span>
+                <span>Form</span>
+                <span></span>
+              </div>
+              {ex.sets.map((set, i) => {
+                const isNewPR = prWeight > 0 && set.weight > prWeight
+                return (
+                  <div key={i} className="set-row set-row-extended">
+                    <span className="set-num">{i + 1}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={set.reps}
+                      onChange={(e) => updateSet(ex.exerciseId, i, { reps: +e.target.value })}
+                      className="input input-sm"
+                    />
+                    <div className="weight-cell">
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={set.weight || ''}
+                        onChange={(e) => updateSet(ex.exerciseId, i, { weight: +e.target.value })}
+                        className="input input-sm"
+                        placeholder="0"
+                      />
+                      {isNewPR && <span className="pr-badge">PR</span>}
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={set.effort ?? ''}
+                      onChange={(e) => updateSet(ex.exerciseId, i, { effort: e.target.value ? +e.target.value : undefined })}
+                      className="input input-sm input-effort"
+                      placeholder="1-5"
+                      title="Effort (1-5)"
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={set.form ?? ''}
+                      onChange={(e) => updateSet(ex.exerciseId, i, { form: e.target.value ? +e.target.value : undefined })}
+                      className="input input-sm input-form"
+                      placeholder="1-5"
+                      title="Form (1-5)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSet(ex.exerciseId, i)}
+                      className="btn-remove btn-remove-sm"
+                      disabled={ex.sets.length === 1}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => addSet(ex.exerciseId)}
+                className="btn-add-set"
+              >
+                + Add set
+              </button>
+            </div>
+          )
+        })}
       </div>
 
       <div className={`form-actions ${isEditing ? 'form-actions-sticky' : ''}`}>
