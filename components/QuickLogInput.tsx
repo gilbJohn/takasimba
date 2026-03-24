@@ -17,6 +17,14 @@ export function QuickLogInput({ onWorkoutParsed, onCancel }: QuickLogInputProps)
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const [isListening, setIsListening] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
 
   const handleParse = useCallback(async () => {
     if (!text.trim()) return
@@ -135,9 +143,10 @@ export function QuickLogInput({ onWorkoutParsed, onCancel }: QuickLogInputProps)
       </label>
       <div className="quick-log-row">
         <textarea
+          ref={textareaRef}
           id="quick-log-input"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTextChange}
           placeholder="e.g. Bench press 3 sets of 10 at 135 lbs, felt easy. Squats 4x8 at 185 lbs, form was good."
           className="quick-log-input"
           rows={3}
