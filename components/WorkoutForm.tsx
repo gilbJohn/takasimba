@@ -47,6 +47,7 @@ export function WorkoutForm({
   const [exercises, setExercises] = useState<ExerciseLog[]>([])
   const [selectedExercise, setSelectedExercise] = useState('')
   const [filterGroup, setFilterGroup] = useState<string>('')
+  const [ratingsVisible, setRatingsVisible] = useState<Set<string>>(new Set())
 
   // Custom exercise creation state
   const [showCustomForm, setShowCustomForm] = useState(false)
@@ -62,7 +63,6 @@ export function WorkoutForm({
     ...DEFAULT_EXERCISES,
     ...customExercises,
   ].sort((a, b) => {
-    // Sort by muscle group first, then name
     if (a.muscleGroup !== b.muscleGroup) return a.muscleGroup.localeCompare(b.muscleGroup)
     return a.name.localeCompare(b.name)
   })
@@ -78,11 +78,19 @@ export function WorkoutForm({
           sets: e.sets.map((s) => ({ ...s })),
         }))
       )
+      // Auto-show ratings for any exercise that has them
+      const withRatings = new Set(
+        initialWorkout.exercises
+          .filter((e) => e.sets.some((s) => s.effort != null || s.form != null))
+          .map((e) => e.exerciseId)
+      )
+      setRatingsVisible(withRatings)
     } else {
       setName('')
       setDate(format(new Date(), 'yyyy-MM-dd'))
       setNotes('')
       setExercises([])
+      setRatingsVisible(new Set())
     }
   }, [initialWorkout])
 
@@ -105,15 +113,17 @@ export function WorkoutForm({
         }))
       : [{ reps: 10, weight: 0 }]
 
-    setExercises((prev) => [
-      ...prev,
-      {
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        muscleGroup: ex.muscleGroup,
-        sets,
-      },
-    ])
+    setExercises((prev) => [...prev, {
+      exerciseId: ex.id,
+      exerciseName: ex.name,
+      muscleGroup: ex.muscleGroup,
+      sets,
+    }])
+
+    // Auto-show ratings if last log had them
+    if (lastLog?.sets.some((s) => s.effort != null || s.form != null)) {
+      setRatingsVisible((prev) => new Set([...prev, ex.id]))
+    }
   }
 
   const addExercise = () => {
@@ -137,6 +147,15 @@ export function WorkoutForm({
     } finally {
       setCustomSaving(false)
     }
+  }
+
+  const toggleRatings = (exerciseId: string) => {
+    setRatingsVisible((prev) => {
+      const next = new Set(prev)
+      if (next.has(exerciseId)) next.delete(exerciseId)
+      else next.add(exerciseId)
+      return next
+    })
   }
 
   const removeExercise = (exerciseId: string) => {
@@ -211,6 +230,7 @@ export function WorkoutForm({
       setDate(format(new Date(), 'yyyy-MM-dd'))
       setNotes('')
       setExercises([])
+      setRatingsVisible(new Set())
     }
   }
 
@@ -234,7 +254,7 @@ export function WorkoutForm({
 
       <div className="form-notes-row">
         <textarea
-          placeholder="Notes (optional) — e.g. felt strong today, slight shoulder discomfort"
+          placeholder="Notes (optional)"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           className="input input-notes"
@@ -277,7 +297,7 @@ export function WorkoutForm({
             className="btn-custom-toggle"
             onClick={() => { setShowCustomForm((v) => !v); setCustomError(null) }}
           >
-            {showCustomForm ? '− Cancel custom exercise' : '+ Create custom exercise'}
+            {showCustomForm ? '− Cancel' : '+ Create custom exercise'}
           </button>
           {showCustomForm && (
             <div className="custom-exercise-form">
@@ -321,41 +341,53 @@ export function WorkoutForm({
       <div className="exercises-list">
         {exercises.map((ex) => {
           const prWeight = prs?.get(ex.exerciseId)?.weight ?? 0
+          const showRatings = ratingsVisible.has(ex.exerciseId)
+          const lastLog = pastWorkouts.length > 0 ? getLastExerciseLog(ex.exerciseId, pastWorkouts) : null
+
           return (
             <div key={ex.exerciseId} className="exercise-card">
               <div className="exercise-header">
-                <div>
+                <div className="exercise-header-info">
                   <h3>{ex.exerciseName}</h3>
-                  {pastWorkouts.length > 0 && (() => {
-                    const last = getLastExerciseLog(ex.exerciseId, pastWorkouts)
-                    if (!last) return null
-                    const hint = last.sets.map((s) => `${s.reps}×${s.weight}lbs`).join(', ')
-                    return (
-                      <span className="last-time-hint">Last: {hint}</span>
-                    )
-                  })()}
+                  {lastLog && (
+                    <span className="last-time-hint">
+                      Last: {lastLog.sets.map((s) => `${s.reps}×${s.weight}`).join(', ')} lbs
+                    </span>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeExercise(ex.exerciseId)}
-                  className="btn-remove"
-                  aria-label="Remove exercise"
-                >
-                  ×
-                </button>
+                <div className="exercise-header-actions">
+                  <button
+                    type="button"
+                    onClick={() => toggleRatings(ex.exerciseId)}
+                    className={`btn-rate-toggle ${showRatings ? 'active' : ''}`}
+                    title={showRatings ? 'Hide effort/form ratings' : 'Rate effort and form'}
+                  >
+                    {showRatings ? 'Hide ratings' : 'Rate'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeExercise(ex.exerciseId)}
+                    className="btn-remove"
+                    aria-label="Remove exercise"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-              <div className="sets-header sets-header-extended">
+
+              <div className={`sets-header ${showRatings ? 'sets-header-extended' : 'sets-header-simple'}`}>
                 <span>Set</span>
                 <span>Reps</span>
                 <span>Weight (lbs)</span>
-                <span>Effort</span>
-                <span>Form</span>
+                {showRatings && <span title="Effort 1-5">Effort</span>}
+                {showRatings && <span title="Form 1-5">Form</span>}
                 <span></span>
               </div>
+
               {ex.sets.map((set, i) => {
                 const isNewPR = prWeight > 0 && set.weight > prWeight
                 return (
-                  <div key={i} className="set-row set-row-extended">
+                  <div key={i} className={`set-row ${showRatings ? 'set-row-extended' : 'set-row-simple'}`}>
                     <span className="set-num">{i + 1}</span>
                     <input
                       type="number"
@@ -376,26 +408,30 @@ export function WorkoutForm({
                       />
                       {isNewPR && <span className="pr-badge">PR</span>}
                     </div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={set.effort ?? ''}
-                      onChange={(e) => updateSet(ex.exerciseId, i, { effort: e.target.value ? +e.target.value : undefined })}
-                      className="input input-sm input-effort"
-                      placeholder="1-5"
-                      title="Effort (1-5)"
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={set.form ?? ''}
-                      onChange={(e) => updateSet(ex.exerciseId, i, { form: e.target.value ? +e.target.value : undefined })}
-                      className="input input-sm input-form"
-                      placeholder="1-5"
-                      title="Form (1-5)"
-                    />
+                    {showRatings && (
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={set.effort ?? ''}
+                        onChange={(e) => updateSet(ex.exerciseId, i, { effort: e.target.value ? +e.target.value : undefined })}
+                        className="input input-sm input-effort"
+                        placeholder="—"
+                        title="Effort (1-5)"
+                      />
+                    )}
+                    {showRatings && (
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={set.form ?? ''}
+                        onChange={(e) => updateSet(ex.exerciseId, i, { form: e.target.value ? +e.target.value : undefined })}
+                        className="input input-sm input-form"
+                        placeholder="—"
+                        title="Form (1-5)"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => removeSet(ex.exerciseId, i)}
