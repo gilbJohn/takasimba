@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nUser input:\n${text}` }] }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
         responseMimeType: 'application/json',
       },
     })
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
     } catch (parseErr) {
       console.error('Parse workout JSON fail. Raw content:', content.slice(0, 500))
       return NextResponse.json(
-        { error: 'AI returned invalid JSON. Try rephrasing your workout.' },
+        { error: 'AI had trouble parsing that. Try shortening your input or splitting it into smaller chunks.' },
         { status: 502 }
       )
     }
